@@ -2,12 +2,16 @@ let quotes = [];
 
 function loadQuotes() {
   const storedQuotes = localStorage.getItem('quotes');
-  quotes = storedQuotes ? JSON.parse(storedQuotes) : [
-    { text: "Life is what happens when you're busy making other plans.", category: "Life" },
-    { text: "The only limit to our realization of tomorrow is our doubts of today.", category: "Motivation" },
-    { text: "Do or do not. There is no try.", category: "Wisdom" },
-  ];
+ quotes = storedQuotes ? JSON.parse(storedQuotes) : [
+  { id: 1, text: "Life is what happens when you're busy making other plans.", category: "Life" },
+  { id: 2, text: "The only limit to our realization of tomorrow is our doubts of today.", category: "Motivation" },
+  { id: 3, text: "Do or do not. There is no try.", category: "Wisdom" },
+];
   saveQuotes(); // Save if using defaults
+}
+
+function generateId() {
+  return Date.now() + Math.floor(Math.random() * 1000);
 }
 
 function saveQuotes() {
@@ -95,15 +99,67 @@ function addQuote() {
     return;
   }
 
-  const newQuote = { text, category };
+  const newQuote = {
+    id: generateId(),
+    text,
+    category
+  };
+
   quotes.push(newQuote);
   saveQuotes();
+  populateCategories();
+  showRandomQuote();
 
+  // Clear inputs
   document.getElementById('newQuoteText').value = '';
   document.getElementById('newQuoteCategory').value = '';
+}
 
-  populateCategories(); // update dropdown with new category if needed
-  showRandomQuote(); // show updated quote
+// Simulated server quotes (acts like remote server data)
+const serverQuotes = [
+  { id: 1, text: "Life is beautiful.", category: "Life" },
+  { id: 4, text: "Success is not final, failure is not fatal.", category: "Motivation" }
+];
+
+// Simulated fetch function that returns server quotes after 1 second delay
+async function fetchServerQuotes() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(serverQuotes);
+    }, 1000);
+  });
+}
+
+async function syncWithServer() {
+  const serverData = await fetchServerQuotes();
+
+  let updated = false;
+  const localMap = new Map(quotes.map(q => [q.id, q]));
+
+  serverData.forEach(serverQuote => {
+    const localQuote = localMap.get(serverQuote.id);
+
+    if (!localQuote) {
+      // New quote from server - add locally
+      quotes.push(serverQuote);
+      updated = true;
+    } else if (
+      localQuote.text !== serverQuote.text || 
+      localQuote.category !== serverQuote.category
+    ) {
+      // Conflict detected - server version wins
+      const index = quotes.findIndex(q => q.id === serverQuote.id);
+      quotes[index] = serverQuote;
+      updated = true;
+    }
+  });
+
+  if (updated) {
+    saveQuotes();
+    populateCategories();
+    filterQuotes();
+    notifyUser("Quotes synced from server. Conflicts resolved.");
+  }
 }
 
 // Export quotes to JSON file
@@ -152,3 +208,20 @@ window.onload = () => {
   createAddQuoteForm();
   filterQuotes();
 };
+
+function notifyUser(message) {
+  const note = document.createElement('div');
+  note.textContent = message;
+  note.style.backgroundColor = '#ffeeba';
+  note.style.border = '1px solid #f5c6cb';
+  note.style.padding = '10px';
+  note.style.marginTop = '10px';
+
+  document.body.insertBefore(note, document.getElementById('quoteDisplay'));
+
+  setTimeout(() => {
+    note.remove();
+  }, 4000);
+}
+
+setInterval(syncWithServer, 20000); // every 20 seconds
