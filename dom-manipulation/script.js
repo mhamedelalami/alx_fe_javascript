@@ -1,42 +1,73 @@
-// ========== Step 0: Initialize ==========
-let quotes = []; // Will load from localStorage
+let quotes = [];
 
-// ========== Step 1: Load quotes from localStorage ==========
 function loadQuotes() {
   const storedQuotes = localStorage.getItem('quotes');
-  if (storedQuotes) {
-    quotes = JSON.parse(storedQuotes);
-  } else {
-    // If none exist, use defaults
-    quotes = [
-      { text: "Life is what happens when you're busy making other plans.", category: "Life" },
-      { text: "The only limit to our realization of tomorrow is our doubts of today.", category: "Motivation" },
-      { text: "Do or do not. There is no try.", category: "Wisdom" },
-    ];
-    saveQuotes(); // Save default quotes
-  }
+  quotes = storedQuotes ? JSON.parse(storedQuotes) : [
+    { text: "Life is what happens when you're busy making other plans.", category: "Life" },
+    { text: "The only limit to our realization of tomorrow is our doubts of today.", category: "Motivation" },
+    { text: "Do or do not. There is no try.", category: "Wisdom" },
+  ];
+  saveQuotes(); // Save if using defaults
 }
 
-// ========== Step 2: Save quotes to localStorage ==========
 function saveQuotes() {
   localStorage.setItem('quotes', JSON.stringify(quotes));
 }
 
-// ========== Step 3: Show a random quote + store in session ==========
-function showRandomQuote() {
-  const randomIndex = Math.floor(Math.random() * quotes.length);
-  const quote = quotes[randomIndex];
-
-  document.getElementById('quoteDisplay').innerHTML = `
-    <blockquote>"${quote.text}"</blockquote>
-    <p><em>Category: ${quote.category}</em></p>
-  `;
-
-  // Store last viewed quote in session storage
-  sessionStorage.setItem('lastQuote', JSON.stringify(quote));
+function saveSelectedCategory(category) {
+  localStorage.setItem('selectedCategory', category);
 }
 
-// ========== Step 4: Create quote form dynamically ==========
+function loadSelectedCategory() {
+  return localStorage.getItem('selectedCategory') || "all";
+}
+
+// Show random quote based on current filter
+function showRandomQuote() {
+  const currentCategory = document.getElementById('categoryFilter').value;
+  const filtered = currentCategory === "all" 
+    ? quotes 
+    : quotes.filter(q => q.category.toLowerCase() === currentCategory.toLowerCase());
+
+  if (filtered.length === 0) {
+    document.getElementById('quoteDisplay').innerHTML = "<p>No quotes available for this category.</p>";
+    return;
+  }
+
+  const randomQuote = filtered[Math.floor(Math.random() * filtered.length)];
+  document.getElementById('quoteDisplay').innerHTML = `
+    <blockquote>"${randomQuote.text}"</blockquote>
+    <p><em>Category: ${randomQuote.category}</em></p>
+  `;
+
+  sessionStorage.setItem('lastQuote', JSON.stringify(randomQuote));
+}
+
+// Dynamically populate category dropdown
+function populateCategories() {
+  const select = document.getElementById('categoryFilter');
+  select.innerHTML = '<option value="all">All Categories</option>';
+
+  const categories = [...new Set(quotes.map(q => q.category))];
+  categories.forEach(cat => {
+    const option = document.createElement('option');
+    option.value = cat;
+    option.textContent = cat;
+    select.appendChild(option);
+  });
+
+  const lastCategory = loadSelectedCategory();
+  select.value = lastCategory;
+}
+
+// Filter quotes when a category is selected
+function filterQuotes() {
+  const category = document.getElementById('categoryFilter').value;
+  saveSelectedCategory(category);
+  showRandomQuote();
+}
+
+// Dynamically build form
 function createAddQuoteForm() {
   const quoteInput = document.createElement('input');
   quoteInput.id = 'newQuoteText';
@@ -55,28 +86,29 @@ function createAddQuoteForm() {
   document.body.appendChild(addButton);
 }
 
-// ========== Step 5: Add new quote and save ==========
 function addQuote() {
-  const quoteText = document.getElementById('newQuoteText').value.trim();
-  const quoteCategory = document.getElementById('newQuoteCategory').value.trim();
+  const text = document.getElementById('newQuoteText').value.trim();
+  const category = document.getElementById('newQuoteCategory').value.trim();
 
-  if (quoteText === '' || quoteCategory === '') {
+  if (!text || !category) {
     alert('Please enter both a quote and a category.');
     return;
   }
 
-  const newQuote = { text: quoteText, category: quoteCategory };
+  const newQuote = { text, category };
   quotes.push(newQuote);
   saveQuotes();
 
   document.getElementById('newQuoteText').value = '';
   document.getElementById('newQuoteCategory').value = '';
-  showRandomQuote();
+
+  populateCategories(); // update dropdown with new category if needed
+  showRandomQuote(); // show updated quote
 }
 
-// ========== Step 6: Export Quotes as JSON File ==========
+// Export quotes to JSON file
 function exportQuotesToJson() {
-  const data = JSON.stringify(quotes, null, 2); // pretty JSON
+  const data = JSON.stringify(quotes, null, 2);
   const blob = new Blob([data], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
@@ -85,38 +117,38 @@ function exportQuotesToJson() {
   link.download = 'quotes.json';
   link.click();
 
-  URL.revokeObjectURL(url); // clean up
+  URL.revokeObjectURL(url);
 }
 
-// ========== Step 7: Import Quotes from JSON File ==========
+// Import quotes from JSON file
 function importFromJsonFile(event) {
   const fileReader = new FileReader();
   fileReader.onload = function (e) {
     try {
-      const importedQuotes = JSON.parse(e.target.result);
-
-      // Check that each entry has text and category
-      if (Array.isArray(importedQuotes) &&
-          importedQuotes.every(q => q.text && q.category)) {
-        quotes.push(...importedQuotes);
+      const imported = JSON.parse(e.target.result);
+      if (Array.isArray(imported) && imported.every(q => q.text && q.category)) {
+        quotes.push(...imported);
         saveQuotes();
+        populateCategories();
+        showRandomQuote();
         alert('Quotes imported successfully!');
       } else {
         alert('Invalid quote format.');
       }
     } catch (err) {
-      alert('Failed to import quotes: ' + err.message);
+      alert('Failed to import: ' + err.message);
     }
   };
   fileReader.readAsText(event.target.files[0]);
 }
 
-// ========== Step 8: Setup Event Listeners and UI ==========
+// Init
 document.getElementById('newQuote').addEventListener('click', showRandomQuote);
 document.getElementById('exportBtn').addEventListener('click', exportQuotesToJson);
 
-window.onload = function () {
+window.onload = () => {
   loadQuotes();
-  showRandomQuote();
+  populateCategories();
   createAddQuoteForm();
+  filterQuotes();
 };
