@@ -189,7 +189,7 @@ async function syncQuotes() {
     saveQuotes();
     populateCategories();
     filterQuotes();
-    notifyUser("Quotes synced from server. Conflicts resolved.");
+    notifyUser("Quotes synced with server!");
   }
 }
 
