@@ -110,9 +110,31 @@ function addQuote() {
   populateCategories();
   showRandomQuote();
 
+  postQuoteToServer(newQuote);
+
   // Clear inputs
   document.getElementById('newQuoteText').value = '';
   document.getElementById('newQuoteCategory').value = '';
+}
+
+async function postQuoteToServer(quote) {
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify(quote),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to post quote');
+
+    const data = await response.json();
+    console.log("Quote posted to server:", data);
+    return data;
+  } catch (err) {
+    console.error("Error posting quote:", err);
+  }
 }
 
 // Simulated server quotes (acts like remote server data)
@@ -122,16 +144,27 @@ const serverQuotes = [
 ];
 
 // Simulated fetch function that returns server quotes after 1 second delay
-async function fetchServerQuotes() {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(serverQuotes);
-    }, 1000);
-  });
+const API_URL = 'https://jsonplaceholder.typicode.com/posts';
+
+async function fetchQuotesFromServer() {
+  try {
+    const response = await fetch(API_URL);
+    if (!response.ok) throw new Error('Failed to fetch');
+    const data = await response.json();
+
+    return data.slice(0, 5).map(post => ({
+      id: post.id,
+      text: post.title,
+      category: "Imported"
+    }));
+  } catch (err) {
+    console.error('Error fetching from server:', err);
+    return [];
+  }
 }
 
-async function syncWithServer() {
-  const serverData = await fetchServerQuotes();
+async function syncQuotes() {
+  const serverData = await fetchQuotesFromServer();
 
   let updated = false;
   const localMap = new Map(quotes.map(q => [q.id, q]));
@@ -140,14 +173,12 @@ async function syncWithServer() {
     const localQuote = localMap.get(serverQuote.id);
 
     if (!localQuote) {
-      // New quote from server - add locally
       quotes.push(serverQuote);
       updated = true;
     } else if (
-      localQuote.text !== serverQuote.text || 
+      localQuote.text !== serverQuote.text ||
       localQuote.category !== serverQuote.category
     ) {
-      // Conflict detected - server version wins
       const index = quotes.findIndex(q => q.id === serverQuote.id);
       quotes[index] = serverQuote;
       updated = true;
@@ -224,4 +255,4 @@ function notifyUser(message) {
   }, 4000);
 }
 
-setInterval(syncWithServer, 20000); // every 20 seconds
+setInterval(syncQuotes, 20000); // every 20 seconds
